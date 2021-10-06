@@ -10,6 +10,13 @@ export const getDefaultProvider = (): string | null => (process.env.NODE_ENV ===
 
 const web3cache = {}
 
+export const XDAI_INFURA_ENDPOINTS = [
+  'https://dai.poa.network',
+  'https://rpc.xdaichain.com',
+  'https://xdai.poanetwork.dev',
+  'wss://rpc.xdaichain.com/wss',
+]
+
 export function createWeb3Api(provider?: string): Web3 {
   const _provider = provider || getDefaultProvider() || ''
 
@@ -41,13 +48,13 @@ function infuraProvider(networkId: Network): string {
 }
 
 // For now only infura provider is available
-export function getProviderByNetwork(networkId: Network | null): string | undefined {
+export function getProviderByNetwork(networkId: Network | null, index = 0): string | undefined {
   switch (networkId) {
     case Network.Mainnet:
     case Network.Rinkeby:
       return infuraProvider(networkId)
     case Network.xDAI:
-      return 'https://dai.poa.network'
+      return XDAI_INFURA_ENDPOINTS[index]
     default:
       return undefined
   }
@@ -57,12 +64,12 @@ export function getProviderByNetwork(networkId: Network | null): string | undefi
 // Advantage is that regular APIs that require web3 instance should work without any changes
 // Also, there's no change to consumers currently importing from <app>/api module
 // Side effect is applied at reducer level (state/network/updater module)
-export function updateWeb3Provider(web3: Web3, networkId?: Network | null): void {
+export function updateWeb3Provider(web3: Web3, networkId?: Network | null, index?: number): void {
   if (!networkId) {
     return
   }
 
-  const provider = getProviderByNetwork(networkId)
+  const provider = getProviderByNetwork(networkId, index)
   console.log('[api:web3] updateWeb3Provider', provider, networkId)
 
   provider && web3.setProvider(provider)

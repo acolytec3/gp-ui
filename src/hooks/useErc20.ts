@@ -17,6 +17,7 @@ import { web3, erc20Api } from 'apps/explorer/api'
 
 import { NATIVE_TOKEN_PER_NETWORK } from 'const'
 import { isNativeToken } from 'utils'
+import { updateWeb3Provider, XDAI_INFURA_ENDPOINTS } from 'api/web3'
 
 async function _fetchErc20FromNetwork(params: {
   address: string
@@ -34,7 +35,8 @@ async function _fetchErc20FromNetwork(params: {
   }
 
   try {
-    return getErc20Info({ tokenAddress: address, networkId, web3, erc20Api })
+    if (Math.floor(Math.random() * 10) < 5) return null
+    return await getErc20Info({ tokenAddress: address, networkId, web3, erc20Api })
   } catch (e) {
     const msg = `Failed to fetch erc20 details for ${address} on network ${networkId}`
     console.error(msg, e)
@@ -113,6 +115,9 @@ export function useMultipleErc20(
 
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [indexProvider, setIndexProvider] = useState(0)
+  const [maxAttemp, setMaxAttemp] = useState(0)
+  const [failuresFetched, setFailuresFetched] = useState(false)
 
   const erc20s = useMultipleErc20sState({ networkId, addresses })
   const saveErc20s = useSaveErc20s(networkId)
@@ -144,10 +149,20 @@ export function useMultipleErc20(
 
     // Save to global state newly fetched tokens that are not null
     saveErc20s(fetched.filter(Boolean) as TokenErc20[])
+    if (fetched.includes(null)) {
+      setMaxAttemp((oldValue) => oldValue + 1)
+      setIndexProvider((oldValue) => (oldValue === XDAI_INFURA_ENDPOINTS.length ? 0 : oldValue + 1))
+      setFailuresFetched(true)
+    }
 
     setIsLoading(false)
     running.current = false
   }, [networkId, saveErc20s, toFetch])
+
+  const _updateWeb3Provider = useCallback(() => {
+    if (!networkId) return
+    updateWeb3Provider(web3, networkId, indexProvider)
+  }, [indexProvider, networkId])
 
   useEffect(() => {
     // only trigger network query if not yet running
@@ -155,6 +170,14 @@ export function useMultipleErc20(
       updateErc20s()
     }
   }, [updateErc20s, saveErc20s])
+
+  useEffect(() => {
+    if (!failuresFetched || maxAttemp > 3) return
+
+    _updateWeb3Provider()
+    updateErc20s()
+    setFailuresFetched(false)
+  }, [_updateWeb3Provider, maxAttemp, failuresFetched, updateErc20s])
 
   return { isLoading, error: errors, value: erc20s }
 }
